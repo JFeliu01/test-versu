@@ -134,7 +134,7 @@ wss.on('connection', (ws) => {
           { role: 'system', content: 'Responde conciso. Máximo 2 párrafos.' },
           { role: 'user', content: text }
         ],
-        model: 'llama3-8b-8192',
+        model: 'llama-3.1-8b-instant',
         temperature: 0.3,
         max_tokens: 150,
         stream: true,
