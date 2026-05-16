@@ -169,6 +169,69 @@ app.post('/conversations/:id/rating', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const userResult = await db.query('SELECT u.id, u.name, u.email, o.name AS org_name FROM users u JOIN organizations o ON o.id = u.org_id WHERE u.id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(userResult.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/settings/api-info', authenticateToken, (req, res) => {
+  const apiKey = process.env.AI_API_KEY || '';
+  const masked = apiKey.length > 8 ? apiKey.slice(0, 4) + '****' + apiKey.slice(-4) : '****';
+  res.json({
+    provider: 'Groq',
+    model: 'llama-3.1-8b-instant',
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    apiKey: masked,
+    status: apiKey ? 'Conectado' : 'Sin configurar'
+  });
+});
+
+app.get('/analytics/worst-prompts', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT m.content AS prompt, c.rating, c.id AS conversation_id,
+              c.created_at
+       FROM messages m
+       JOIN conversations c ON c.id = m.conversation_id
+       WHERE c.org_id = $1
+         AND c.rating IS NOT NULL
+         AND m.role = 'user'
+         AND m.id = (SELECT MIN(id) FROM messages WHERE conversation_id = c.id AND role = 'user')
+       ORDER BY c.rating ASC, c.created_at DESC
+       LIMIT 5`,
+      [req.user.org_id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/analytics/avg-response-time', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT AVG(response_time) AS avg_seconds FROM (
+        SELECT EXTRACT(EPOCH FROM (
+          (SELECT MIN(created_at) FROM messages WHERE conversation_id = m.conversation_id AND role = 'assistant' AND id > m.id) - m.created_at
+        )) AS response_time
+        FROM messages m
+        JOIN conversations c ON c.id = m.conversation_id
+        WHERE c.org_id = $1 AND m.role = 'user'
+      ) sub WHERE response_time IS NOT NULL`,
+      [req.user.org_id]
+    );
+    const avg = result.rows[0]?.avg_seconds ? parseFloat(result.rows[0].avg_seconds).toFixed(1) : '0';
+    res.json({ avg_seconds: avg });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 wss.on('connection', (ws) => {
   wsActiveConnections.inc();
 
