@@ -27,6 +27,8 @@ Credenciales de prueba para el sistema Multi-tenancy:
 
 ## Decisiones de Arquitectura
 
+![Diagrama de arquitectura](arqui.png)
+
 * Multi-tenancy a nivel de fila: Extraemos el identificador de la organizacion directamente del token JWT en cada peticion. El backend se encarga de filtrar la informacion en la base de datos de manera segura, lo que garantiza un aislamiento total de la informacion entre clientes.
 
 * Streaming Optimizado: Utilizamos WebSockets puros en Node.js. El modelo de inteligencia artificial envia los fragmentos de texto al backend, y este los pasa directamente al frontend. Solo guardamos el mensaje en PostgreSQL cuando el flujo termina, lo que reduce mucho la carga en la base de datos.
@@ -35,6 +37,8 @@ Credenciales de prueba para el sistema Multi-tenancy:
 
 ## Herramientas de Inteligencia Artificial Usadas
 Utilizamos Groq con el modelo `llama-3.1-8b-instant`. Inicialmente usabamos una version anterior pero tuvimos que migrar a esta porque la otra fue descontinuada. Elegimos Groq por su increible baja latencia, lo cual hace que el frontend se sienta instantaneo mientras transmite el texto palabra por palabra.
+
+Para realizar el código, se planeó con gemini 3.1 pro y el editor de código fue el de antigravity, utilizando como modelo Claude Opus 4.6
 
 ## Mejoras de Interfaz e Implementaciones Recientes
 1. Personalidades a medida: En la vista de configuraciones agregamos descripciones mas humanas y detalladas para el agente. Arreglamos un detalle visual para que puedas leer las descripciones completas sin que se recorten. Estas preferencias se envian de forma fluida al backend mediante WebSocket.
@@ -51,3 +55,7 @@ Utilizamos Groq con el modelo `llama-3.1-8b-instant`. Inicialmente usabamos una 
 * Uso de Terraform para provisionar la infraestructura.
 * Automatizacion a traves de canales de CI.
 * Observabilidad en funcionamiento gracias a Grafana y Prometheus.
+
+### Faltantes para el producto final
+* Correr el código en un IaaS como AWS (Existe el terraform, pero el tier gratuito de AWS no cubre la base de datos que requiere el proyecto).
+
