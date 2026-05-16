@@ -100,7 +100,7 @@ export default function Analytics() {
                 <YAxis axisLine={false} tickLine={false} allowDecimals={false} tick={{ fontSize: 11 }} unit="%" />
                 <RechartsTooltip
                   cursor={{ fill: '#F1F5F9' }}
-                  formatter={(value: number, name: string, props: any) => [`${value}% (${props.payload.cantidad})`, 'Porcentaje']}
+                  formatter={(value: any, _name: any, props: any) => [`${value}% (${props.payload.cantidad})`, 'Porcentaje']}
                 />
                 <Bar dataKey="porcentaje" fill="#3B82F6" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -124,13 +124,13 @@ export default function Analytics() {
                     outerRadius={90}
                     paddingAngle={4}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                   >
                     {pieData.map((entry) => (
                       <Cell key={entry.name} fill={CHANNEL_COLORS[entry.name] || '#94A3B8'} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value: number) => [`${value} conversaciones`, 'Total']} />
+                  <RechartsTooltip formatter={(value: any) => [`${value} conversaciones`, 'Total']} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (

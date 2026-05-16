@@ -167,10 +167,7 @@ export default function Conversations() {
     setInputText('');
   };
 
-  const applyFilters = () => {
-    setPage(1);
-    fetchConversations(1);
-  };
+
 
   const formatDuration = (s: number) => {
     if (s < 60) return `${s}s`;
