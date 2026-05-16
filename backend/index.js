@@ -76,8 +76,53 @@ app.post('/login', async (req, res) => {
 
 app.get('/conversations', authenticateToken, async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM conversations WHERE org_id = $1 ORDER BY created_at DESC', [req.user.org_id]);
-    res.json(result.rows);
+    const { page = 1, limit = 10, status, rating_min, channel, date_from, date_to } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+    
+    let where = 'WHERE c.org_id = $1';
+    const params = [req.user.org_id];
+    let paramIdx = 2;
+
+    if (status && status !== 'Todos') {
+      where += ` AND c.status = $${paramIdx++}`;
+      params.push(status);
+    }
+    if (rating_min && rating_min !== 'Todos') {
+      where += ` AND c.rating >= $${paramIdx++}`;
+      params.push(Number(rating_min));
+    }
+    if (channel && channel !== 'Todos') {
+      where += ` AND c.channel = $${paramIdx++}`;
+      params.push(channel);
+    }
+    if (date_from) {
+      where += ` AND c.created_at >= $${paramIdx++}`;
+      params.push(date_from);
+    }
+    if (date_to) {
+      where += ` AND c.created_at <= $${paramIdx++}`;
+      params.push(date_to + 'T23:59:59');
+    }
+
+    const countResult = await db.query(`SELECT COUNT(*) FROM conversations c ${where}`, params);
+    const total = parseInt(countResult.rows[0].count);
+
+    const result = await db.query(
+      `SELECT c.*,
+        COALESCE(
+          EXTRACT(EPOCH FROM (
+            (SELECT MAX(created_at) FROM messages WHERE conversation_id = c.id) -
+            (SELECT MIN(created_at) FROM messages WHERE conversation_id = c.id)
+          )), 0
+        )::int AS duration_seconds
+      FROM conversations c
+      ${where}
+      ORDER BY c.created_at DESC
+      LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
+      [...params, Number(limit), offset]
+    );
+
+    res.json({ data: result.rows, total, page: Number(page), limit: Number(limit) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -86,7 +131,16 @@ app.get('/conversations', authenticateToken, async (req, res) => {
 app.post('/conversations', authenticateToken, async (req, res) => {
   try {
     const result = await db.query('INSERT INTO conversations (org_id) VALUES ($1) RETURNING *', [req.user.org_id]);
-    res.json(result.rows[0]);
+    const newConv = result.rows[0];
+
+    // Broadcast to all connected WebSocket clients in the same org
+    wss.clients.forEach(client => {
+      if (client.readyState === 1 && client.orgId === req.user.org_id) {
+        client.send(JSON.stringify({ type: 'new_conversation', conversation: { ...newConv, duration_seconds: 0 } }));
+      }
+    });
+
+    res.json(newConv);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -120,8 +174,18 @@ wss.on('connection', (ws) => {
 
   ws.on('message', async (message) => {
     try {
-      const { conversationId, text, token, systemPrompt } = JSON.parse(message.toString());
+      const parsed = JSON.parse(message.toString());
+
+      // Handle registration for real-time broadcasts
+      if (parsed.type === 'register') {
+        const decoded = jwt.verify(parsed.token, JWT_SECRET);
+        ws.orgId = decoded.org_id;
+        return;
+      }
+
+      const { conversationId, text, token, systemPrompt } = parsed;
       const decoded = jwt.verify(token, JWT_SECRET);
+      ws.orgId = decoded.org_id;
       
       const conv = await db.query('SELECT org_id FROM conversations WHERE id = $1', [conversationId]);
       if (conv.rows.length === 0 || conv.rows[0].org_id !== decoded.org_id) {

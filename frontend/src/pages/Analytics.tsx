@@ -15,11 +15,12 @@ export default function Analytics() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const res = await fetch('http://localhost:4000/conversations', {
+      const res = await fetch(`http://${window.location.hostname}:4000/conversations?limit=1000`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        setConversations(await res.json());
+        const json = await res.json();
+        setConversations(json.data || json);
       }
     };
     fetchData();
