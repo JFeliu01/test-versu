@@ -113,10 +113,13 @@ export default function Conversations() {
     setMessages(prev => [...prev, { role: 'user', content: inputText }]);
     setIsStreaming(true);
     
+    const systemPrompt = localStorage.getItem('system_prompt_content') || 'Responde conciso. Máximo 2 párrafos.';
+    
     wsRef.current?.send(JSON.stringify({
       conversationId: selectedId,
       text: inputText,
-      token
+      token,
+      systemPrompt
     }));
     
     setInputText('');

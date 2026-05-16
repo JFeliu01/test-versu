@@ -120,7 +120,7 @@ wss.on('connection', (ws) => {
 
   ws.on('message', async (message) => {
     try {
-      const { conversationId, text, token } = JSON.parse(message.toString());
+      const { conversationId, text, token, systemPrompt } = JSON.parse(message.toString());
       const decoded = jwt.verify(token, JWT_SECRET);
       
       const conv = await db.query('SELECT org_id FROM conversations WHERE id = $1', [conversationId]);
@@ -129,9 +129,16 @@ wss.on('connection', (ws) => {
         return;
       }
 
+      const previousMessagesQuery = await db.query('SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC', [conversationId]);
+      const previousMessages = previousMessagesQuery.rows.map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
       const stream = await groq.chat.completions.create({
         messages: [
-          { role: 'system', content: 'Responde conciso. Máximo 2 párrafos.' },
+          { role: 'system', content: systemPrompt || 'Responde conciso. Máximo 2 párrafos.' },
+          ...previousMessages,
           { role: 'user', content: text }
         ],
         model: 'llama-3.1-8b-instant',
